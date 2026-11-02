@@ -76,8 +76,8 @@
 What you can do:
 
 - Register expenses with a one-line message (`200 groceries`)
-- Inspect today's transactions (`/today`)
-- See last-7-days spend by day (`/week`)
+- Inspect today's transactions with income / expenses / balance (`/today`)
+- See last-7-days spend by day plus income / expenses / balance (`/week`)
 - View income / expenses / balance for the current month (`/summary`)
 
 Access is restricted to a single Telegram user ID. Secrets and transaction payloads are not logged; user-facing errors stay short.
@@ -253,8 +253,8 @@ Full day-to-day guide: **[docs/USAGE.md](docs/USAGE.md)**.
 | Command | Description |
 |---------|-------------|
 | `/start` | Help text |
-| `/today` | Today's transactions |
-| `/week` | Last 7 days (daily expense totals) |
+| `/today` | Today's transactions + income / expenses / balance |
+| `/week` | Last 7 days (daily expense totals) + income / expenses / balance |
 | `/summary` | Income / expenses / balance for the **current calendar month** |
 
 ### Transaction syntax

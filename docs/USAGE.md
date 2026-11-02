@@ -1,18 +1,17 @@
 # Usage
 
-How to use **Mimir Bot** day to day. The bot is a thin Telegram interface over [mimir-api](https://github.com/rdvid/mimir-api) — the API owns all persistence and business logic.
+How to use **Mimir Bot** day to day. The bot is a thin Telegram interface over [mimir-api](https://github.com/rdvid/mimir-api).
+
+**Important:** Creates from the bot are saved as **drafts**. Confirm or edit them in the dashboard (`/drafts`). Pending drafts older than **3 days** are confirmed automatically.
 
 ## Before you start
 
 1. mimir-api is running (default: `http://localhost:5000`).
 2. `.env` is filled (`TELEGRAM_BOT_TOKEN`, `API_URL`, `TELEGRAM_ALLOWED_USER_ID`, `API_EMAIL`, `API_PASSWORD`).
 3. The bot is running (`npm run dev` or `npm start`).
-4. You message the bot from the Telegram account matching `TELEGRAM_ALLOWED_USER_ID`. Other users are ignored (no reply).
+4. You message the bot from the Telegram account matching `TELEGRAM_ALLOWED_USER_ID`.
 
-On startup the bot:
-
-- Logs in to mimir-api (`POST /auth/login`) and caches the JWT
-- Resolves the default **"Other"** category for new expenses
+On startup the bot logs in and resolves the default **"Other"** category (fallback only).
 
 ---
 
@@ -20,160 +19,67 @@ On startup the bot:
 
 ### `/start`
 
-Shows a short help message:
+Help covering expenses, income, categories, and the draft flow.
 
-```text
-💰 Personal Finance
+### `/expense <amount> [note...] <category>` / `/income <amount> [note...] <category>`
 
-Add an expense:
-200 groceries
-45 lunch
+Creates a **transaction draft** (`POST /drafts`). The **last word** is the category.
 
-Commands:
-/today
-/week
-/summary
-```
+If that category does not exist yet, a **category draft** is created as well.
 
-### `/today`
+### `/category <name>`
 
-Lists today's transactions (America/Sao_Paulo calendar day) and the expense total.
+Creates a **category draft**.
 
-```text
-💸 Today
+### `/categories`
 
-R$ 42,00  Lunch
-R$ 18,50  Uber
-R$ 200,00 Groceries
+Lists existing (confirmed) category names from the API.
 
-Total: R$ 260,50
-```
+### `/today` / `/week` / `/summary`
 
-If there are none:
+Read-only reports from confirmed transactions only. Each ends with **Income**, **Expenses**, and **Balance**:
 
-```text
-No transactions today.
-```
-
-### `/week`
-
-Shows the last 7 days (including today), one line per day with expense totals:
-
-```text
-📅 Last 7 days
-
-Seg  R$ 120,00
-Ter  R$ 85,50
-Qua  R$ 340,00
-Qui  R$ 45,00
-Sex  R$ 210,00
-Sáb  R$ 0,00
-Dom  R$ 0,00
-
-Total: R$ 800,50
-```
-
-Days with no expenses still appear as `R$ 0,00`.
-
-### `/summary`
-
-Income, expenses, and balance for the **current calendar month** (from the 1st through today):
-
-```text
-📊 Summary
-
-Income:   R$ 5.000,00
-Expenses: R$ 2.400,00
-Balance:  R$ 2.600,00
-```
+- `/today` — list today's transactions, then period totals
+- `/week` — daily expense totals for the last 7 days, then period totals
+- `/summary` — income / expenses / balance for the current calendar month
 
 ---
 
-## Adding expenses
+## Free-text messages
 
-Send a plain text message (not a command). Format:
-
-```text
-<amount> <description>
-```
-
-### Examples
+Format: `<amount> [note...] <category>` — last word is the category.
 
 | You send | Result |
 |----------|--------|
-| `200 groceries` | Expense R$ 200,00 — groceries |
-| `45.50 lunch` | Expense R$ 45,50 — lunch |
-| `45,50 lunch` | Same (comma decimals OK) |
-| `12 coffee` | Expense R$ 12,00 — coffee |
+| `200 Groceries` | expense draft under Groceries (if it exists) |
+| `45 lunch Food` | expense draft, note `lunch`, category Food |
+| `30 Pets` | expense draft + **category draft** `Pets` (if Pets does not exist) |
+| `+500 salary Income` | income draft under Income |
+| `income 500 salary Income` | same |
 
-Confirmation reply:
-
-```text
-✅ R$ 200,00 — groceries
-```
-
-### Rules
-
-- First token must be a positive number (optional decimals with `.` or `,`)
-- Everything after the amount is the description (`note` on the API)
-- MVP treats all plain messages as **expenses** (type `expense`)
-- Category is always the auto-resolved **"Other"** category
-- Date is always **today** (America/Sao_Paulo)
-
-### What gets sent to the API
+Reply when the category already exists:
 
 ```text
-200 groceries
+📝 Draft saved: R$ 45,00 — lunch · Food
+Confirm or edit in the dashboard (auto-confirms in 3 days).
 ```
 
-→
-
-```http
-POST /transactions
-Authorization: Bearer <jwt>
-Content-Type: application/json
-
-{
-  "categoryId": "<Other UUID>",
-  "type": "expense",
-  "amount": 200,
-  "date": "YYYY-MM-DD",
-  "note": "groceries"
-}
-```
-
-### Malformed input
-
-If the message cannot be parsed:
+Reply when a new category draft is also created:
 
 ```text
-I couldn't understand that.
-
-Example:
-200 groceries
+📝 Draft saved: R$ 30,00 — Pets
+📁 Category draft also saved: Pets
+Confirm or edit in the dashboard (auto-confirms in 3 days).
 ```
 
-Examples of invalid input: `groceries`, `200`, `-10 coffee`, empty messages.
+Category-only drafts:
 
----
+```text
+📝 Category draft saved: Food
+Confirm or edit in the dashboard (auto-confirms in 3 days).
+```
 
-## Errors
-
-Technical details are logged to the server console. Telegram replies stay short:
-
-| Situation | Reply |
-|-----------|--------|
-| API unreachable | `❌ Couldn't reach the finance API.` |
-| Auth failure | `❌ Authentication with the finance API failed.` |
-| Other API error | `❌ Finance API request failed.` |
-
----
-
-## Security notes
-
-- Only `TELEGRAM_ALLOWED_USER_ID` can use the bot.
-- Bot token, API credentials, and transaction payloads are not logged.
-- Do not share your bot with other Telegram accounts unless you change the allowed user ID.
+Transaction drafts use date **today** (America/Sao_Paulo). On confirm, a missing category named in the draft is created (and any matching category draft is settled).
 
 ---
 
@@ -182,7 +88,9 @@ Technical details are logged to the server console. Telegram replies stay short:
 | Action | How |
 |--------|-----|
 | Help | `/start` |
-| Add expense | `200 groceries` |
-| Today | `/today` |
-| Last 7 days | `/week` |
-| Month summary | `/summary` |
+| Expense draft | `45 lunch Food` or `/expense 45 lunch Food` |
+| Income draft | `+500 salary Income` or `/income 500 salary Income` |
+| New category via expense | `30 Pets` (creates category draft too) |
+| Category draft | `/category Food` |
+| List categories | `/categories` |
+| Confirm drafts | Dashboard → Drafts |

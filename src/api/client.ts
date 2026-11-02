@@ -3,11 +3,14 @@ import type {
   ApiEnvelope,
   ApiErrorKind,
   Category,
-  CreateTransactionBody,
+  CategoryDraftPayload,
+  CreateDraftBody,
+  Draft,
   LoginResponse,
   ParsedTransaction,
   PeriodSummary,
   Transaction,
+  TransactionDraftPayload,
 } from '../types/api.js';
 
 const TIMEZONE = 'America/Sao_Paulo';
@@ -85,8 +88,34 @@ async function login(): Promise<void> {
   token = envelope.data.token;
 }
 
+export async function listCategories(): Promise<Category[]> {
+  return request<Category[]>('/categories');
+}
+
+export function findCategoryByName(
+  hint: string | undefined,
+  categories: Category[],
+): Category | undefined {
+  if (!hint?.trim()) return undefined;
+  const needle = hint.trim().toLowerCase();
+  return categories.find((c) => c.name.toLowerCase() === needle);
+}
+
+export function resolveCategoryId(
+  hint: string | undefined,
+  categories: Category[],
+  fallbackId: string,
+): string {
+  return findCategoryByName(hint, categories)?.id ?? fallbackId;
+}
+
+export interface CreateTransactionDraftResult {
+  transaction: Draft;
+  category: Draft | null;
+}
+
 async function resolveDefaultCategory(): Promise<void> {
-  const categories = await request<Category[]>('/categories');
+  const categories = await listCategories();
   const other = categories.find((c) => c.name.toLowerCase() === 'other');
   if (!other) {
     throw new ApiClientError('http', 'Default category "Other" not found');
@@ -152,23 +181,58 @@ export async function initApiClient(env: Env): Promise<void> {
   console.log('API client ready (authenticated, default category resolved)');
 }
 
-export async function createTransaction(parsed: ParsedTransaction): Promise<Transaction> {
+export async function createDraft(body: CreateDraftBody): Promise<Draft> {
+  return request<Draft>('/drafts', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, source: body.source ?? 'bot' }),
+  });
+}
+
+export async function createTransactionDraft(
+  parsed: ParsedTransaction,
+  categoryId?: string,
+): Promise<CreateTransactionDraftResult> {
   if (!defaultCategoryId) {
     throw new ApiClientError('http', 'Default category not initialized');
   }
 
-  const body: CreateTransactionBody = {
-    categoryId: defaultCategoryId,
+  const categories = await listCategories();
+  const existing = categoryId
+    ? categories.find((c) => c.id === categoryId)
+    : findCategoryByName(parsed.categoryHint, categories);
+
+  let categoryDraft: Draft | null = null;
+  const note = parsed.note;
+
+  const payload: TransactionDraftPayload = {
     type: parsed.type,
     amount: parsed.amount,
     date: todayLocal(),
-    note: parsed.description,
+    note,
   };
 
-  return request<Transaction>('/transactions', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  if (existing) {
+    payload.categoryId = existing.id;
+    payload.categoryName = existing.name;
+  } else {
+    // Unknown category → draft the category and link the transaction by name.
+    const name = parsed.categoryHint.trim();
+    categoryDraft = await createCategoryDraft(name);
+    payload.categoryName = name;
+  }
+
+  const transaction = await createDraft({ kind: 'transaction', payload });
+  return { transaction, category: categoryDraft };
+}
+
+export async function createCategoryDraft(name: string): Promise<Draft> {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new ApiClientError('http', 'Category name is required');
+  }
+
+  const payload: CategoryDraftPayload = { name: trimmed };
+  return createDraft({ kind: 'category', payload });
 }
 
 export async function getTodayTransactions(): Promise<Transaction[]> {

@@ -46,10 +46,51 @@ export interface CreateTransactionBody {
   note?: string | null;
 }
 
+export type DraftKind = 'transaction' | 'category';
+export type DraftStatus = 'pending' | 'confirmed' | 'rejected';
+
+export interface TransactionDraftPayload {
+  categoryId?: string;
+  categoryName?: string;
+  type: TransactionType;
+  amount: number;
+  date: string;
+  note?: string | null;
+}
+
+export interface CategoryDraftPayload {
+  name: string;
+}
+
+export type DraftPayload = TransactionDraftPayload | CategoryDraftPayload;
+
+export interface Draft {
+  id: string;
+  userId: string;
+  kind: DraftKind;
+  status: DraftStatus;
+  payload: DraftPayload;
+  source: string;
+  confirmedAt: string | null;
+  rejectedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDraftBody {
+  kind: DraftKind;
+  payload: DraftPayload;
+  source?: string;
+}
+
 export interface ParsedTransaction {
   amount: number;
   description: string;
-  type: 'expense';
+  type: TransactionType;
+  /** Last token after amount — used as category name. */
+  categoryHint: string;
+  /** Remaining words before the category hint; empty when only one token. */
+  note: string | null;
 }
 
 export interface LoginResponse {

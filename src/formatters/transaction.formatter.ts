@@ -15,19 +15,69 @@ export function formatHelp(): string {
   return [
     '💰 Personal Finance',
     '',
+    'Creates are saved as drafts — confirm in the dashboard (auto after 3 days).',
+    '',
+    'Format: <amount> [note...] <category>',
+    'Last word is the category. Unknown categories also get a category draft.',
+    '',
     'Add an expense:',
-    '200 groceries',
-    '45 lunch',
+    '200 Groceries',
+    '45 lunch Food',
+    '',
+    'Add income:',
+    '+500 salary Income',
+    'income 500 salary Income',
     '',
     'Commands:',
+    '/expense 45 lunch Food',
+    '/income 500 salary Income',
+    '/category Food',
+    '/categories',
     '/today',
     '/week',
     '/summary',
   ].join('\n');
 }
 
-export function formatCreated(amount: number, description: string): string {
-  return `✅ ${formatCurrency(amount)} — ${description}`;
+export function formatDraftSaved(
+  amount: number,
+  categoryName: string,
+  type: 'expense' | 'income' = 'expense',
+  note?: string | null,
+  alsoCategoryDraft = false,
+): string {
+  const prefix = type === 'income' ? '+' : '';
+  const detail = note?.trim() ? `${note} · ${categoryName}` : categoryName;
+  const lines = [
+    `📝 Draft saved: ${prefix}${formatCurrency(amount)} — ${detail}`,
+  ];
+  if (alsoCategoryDraft) {
+    lines.push(`📁 Category draft also saved: ${categoryName}`);
+  }
+  lines.push('Confirm or edit in the dashboard (auto-confirms in 3 days).');
+  return lines.join('\n');
+}
+
+export function formatCategoryDraftSaved(name: string): string {
+  return [
+    `📝 Category draft saved: ${name}`,
+    'Confirm or edit in the dashboard (auto-confirms in 3 days).',
+  ].join('\n');
+}
+
+export function formatCategoryList(names: string[]): string {
+  if (names.length === 0) {
+    return 'No categories yet. Create one with /category Food';
+  }
+  return ['📁 Categories', '', ...names.map((n) => `• ${n}`)].join('\n');
+}
+
+export function formatCategoryUsage(): string {
+  return ['Usage:', '/category Food'].join('\n');
+}
+
+export function formatTransactionCommandUsage(command: 'expense' | 'income'): string {
+  return ['Usage:', `/${command} 45 lunch Food`].join('\n');
 }
 
 export function formatEmpty(label: string): string {
@@ -35,7 +85,14 @@ export function formatEmpty(label: string): string {
 }
 
 export function formatMalformedInput(): string {
-  return ["I couldn't understand that.", '', 'Example:', '200 groceries'].join('\n');
+  return [
+    "I couldn't understand that.",
+    '',
+    'Examples:',
+    '200 Groceries',
+    '45 lunch Food',
+    '+500 salary Income',
+  ].join('\n');
 }
 
 export function formatApiError(kind: ApiErrorKind): string {
@@ -54,6 +111,32 @@ function displayName(tx: Transaction): string {
   return tx.note?.trim() || tx.categoryName || '—';
 }
 
+function totalsFromTransactions(transactions: Transaction[]): {
+  totalIncome: number;
+  totalExpense: number;
+  net: number;
+} {
+  let totalIncome = 0;
+  let totalExpense = 0;
+  for (const tx of transactions) {
+    if (tx.type === 'income') totalIncome += tx.amount;
+    else totalExpense += tx.amount;
+  }
+  return { totalIncome, totalExpense, net: totalIncome - totalExpense };
+}
+
+function formatTotalsBlock(totals: {
+  totalIncome: number;
+  totalExpense: number;
+  net: number;
+}): string[] {
+  return [
+    `Income:   ${formatCurrency(totals.totalIncome)}`,
+    `Expenses: ${formatCurrency(totals.totalExpense)}`,
+    `Balance:  ${formatCurrency(totals.net)}`,
+  ];
+}
+
 export function formatTodayList(transactions: Transaction[]): string {
   if (transactions.length === 0) {
     return formatEmpty('today');
@@ -64,11 +147,13 @@ export function formatTodayList(transactions: Transaction[]): string {
     return `${prefix}${formatCurrency(tx.amount)}  ${displayName(tx)}`;
   });
 
-  const expenseTotal = transactions
-    .filter((tx) => tx.type === 'expense')
-    .reduce((sum, tx) => sum + tx.amount, 0);
-
-  return ['💸 Today', '', ...lines, '', `Total: ${formatCurrency(expenseTotal)}`].join('\n');
+  return [
+    '💸 Today',
+    '',
+    ...lines,
+    '',
+    ...formatTotalsBlock(totalsFromTransactions(transactions)),
+  ].join('\n');
 }
 
 function weekdayLabel(isoDate: string): string {
@@ -103,17 +188,23 @@ export function formatWeekSummary(transactions: Transaction[], from: string, to:
     return `${label}  ${formatCurrency(total)}`;
   });
 
-  const total = expenses.reduce((sum, tx) => sum + tx.amount, 0);
-
-  return ['📅 Last 7 days', '', ...dayLines, '', `Total: ${formatCurrency(total)}`].join('\n');
+  return [
+    '📅 Last 7 days',
+    '',
+    ...dayLines,
+    '',
+    ...formatTotalsBlock(totalsFromTransactions(transactions)),
+  ].join('\n');
 }
 
 export function formatPeriodSummary(summary: PeriodSummary): string {
   return [
     '📊 Summary',
     '',
-    `Income:   ${formatCurrency(summary.totalIncome)}`,
-    `Expenses: ${formatCurrency(summary.totalExpense)}`,
-    `Balance:  ${formatCurrency(summary.net)}`,
+    ...formatTotalsBlock({
+      totalIncome: summary.totalIncome,
+      totalExpense: summary.totalExpense,
+      net: summary.net,
+    }),
   ].join('\n');
 }

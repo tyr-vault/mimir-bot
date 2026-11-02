@@ -1,8 +1,8 @@
 import type { Bot } from 'grammy';
-import { ApiClientError, createTransaction } from '../api/client.js';
+import { ApiClientError, createTransactionDraft } from '../api/client.js';
 import {
   formatApiError,
-  formatCreated,
+  formatDraftSaved,
   formatMalformedInput,
 } from '../formatters/transaction.formatter.js';
 import { parseTransaction } from '../parser/transaction.parser.js';
@@ -27,8 +27,16 @@ export function registerMessages(bot: Bot): void {
     }
 
     try {
-      await createTransaction(parsed);
-      await ctx.reply(formatCreated(parsed.amount, parsed.description));
+      const result = await createTransactionDraft(parsed);
+      await ctx.reply(
+        formatDraftSaved(
+          parsed.amount,
+          parsed.categoryHint,
+          parsed.type,
+          parsed.note,
+          Boolean(result.category),
+        ),
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[create] ${message}`);

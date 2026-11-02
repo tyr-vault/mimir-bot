@@ -1,8 +1,10 @@
 .PHONY: help setup ensure-api dev up down logs restart rebuild ps clean prod-up prod-down
 
 # Sibling mimir-api repo (override: make dev API_DIR=/path/to/mimir-api)
-API_DIR       ?= ../mimir-api
+API_DIR       ?= $(abspath ../mimir-api)
 API_URL       ?= http://localhost:5000
+PORT          ?= 5000
+POSTGRES_PORT ?= 5432
 API_WAIT_SECS ?= 60
 ENV_FILE      ?= .env
 COMPOSE       := docker compose -f docker-compose.yml -f docker-compose.dev.yml
