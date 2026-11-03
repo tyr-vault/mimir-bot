@@ -1,4 +1,4 @@
-.PHONY: help setup ensure-api dev up down logs restart rebuild ps clean prod-up prod-down
+.PHONY: help setup ensure-api install test lint typecheck dev up down logs restart rebuild ps clean prod-up prod-down
 
 # Sibling mimir-api repo (override: make dev API_DIR=/path/to/mimir-api)
 API_DIR       ?= $(abspath ../mimir-api)
@@ -10,6 +10,9 @@ ENV_FILE      ?= .env
 COMPOSE       := docker compose -f docker-compose.yml -f docker-compose.dev.yml
 COMPOSE_PROD  := docker compose
 COMPOSE_FLAGS := --remove-orphans
+VENV          := .venv
+PYTHON        := $(VENV)/bin/python
+PIP           := $(VENV)/bin/pip
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -18,8 +21,23 @@ setup: ## Create .env from .env.default if missing
 	@test -f $(ENV_FILE) || (cp .env.default $(ENV_FILE) && echo "Created $(ENV_FILE) from .env.default — fill in secrets.")
 	@echo "Ready — edit $(ENV_FILE) if needed."
 
-# mimir-api `make dev` is foreground; we call `make up` (same compose stack, detached)
-# so both API and bot can run on the same machine.
+install: ## Create venv and install runtime + dev dependencies
+	python3 -m venv $(VENV)
+	$(PIP) install -U pip
+	$(PIP) install 'aiogram>=3.15,<4' 'httpx>=0.27' 'pydantic>=2.9' 'pydantic-settings>=2.5' \
+		'pytest>=8.3' 'pytest-asyncio>=0.24' 'ruff>=0.6' 'mypy>=1.11'
+	@echo "Installed. Activate with: source $(VENV)/bin/activate"
+
+test: ## Run pytest
+	PYTHONPATH=src $(VENV)/bin/pytest -q
+
+lint: ## Run ruff
+	$(VENV)/bin/ruff check src tests
+
+typecheck: ## Run mypy
+	PYTHONPATH=src $(VENV)/bin/mypy src
+
+# mimir-api `make up` (detached) so both API and bot can run on the same machine.
 ensure-api: ## Start mimir-api (make -C API_DIR up) if not already reachable
 	@if curl -sf -o /dev/null --max-time 2 "$(API_URL)/api/docs" \
 		|| curl -sf -o /dev/null --max-time 2 "$(API_URL)/" \

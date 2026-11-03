@@ -1,22 +1,16 @@
-# Local development overlay — hot reload via tsx watch + bind mounts.
+# Local development overlay — hot reload via watchfiles + bind mounts.
 # Same machine as mimir-api compose; use API_URL=http://host.docker.internal:5000
 # Preferred: make dev  (starts mimir-api via its Makefile if needed, then this stack)
-# Or:        npm run docker:dev
-
 
 services:
   bot:
     build:
       dockerfile: Dockerfile.dev
     volumes:
-      - .:/app
-      - bot_node_modules:/app/node_modules
+      - ./src:/app/src
+      - ./pyproject.toml:/app/pyproject.toml:ro
     environment:
-      NODE_ENV: development
-      CHOKIDAR_USEPOLLING: 'true'
+      PYTHONPATH: /app/src
       API_URL: http://host.docker.internal:5000
-    command: npm run dev
+    command: watchfiles --filter python "python src/main.py" src
     restart: 'no'
-
-volumes:
-  bot_node_modules:

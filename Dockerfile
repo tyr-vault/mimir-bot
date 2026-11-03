@@ -1,24 +1,19 @@
-FROM node:24-alpine AS deps
+FROM python:3.12-slim AS base
+
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
 
-FROM node:24-alpine AS builder
-WORKDIR /app
+COPY pyproject.toml ./
+COPY src ./src
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+RUN pip install --no-cache-dir \
+    'aiogram>=3.15,<4' \
+    'httpx>=0.27' \
+    'pydantic>=2.9' \
+    'pydantic-settings>=2.5'
 
-RUN npm run build && npm prune --omit=dev
-
-FROM node:24-alpine AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-
-COPY --from=builder /app/package.json /app/package-lock.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-
-CMD ["node", "dist/bot.js"]
+WORKDIR /app/src
+CMD ["python", "main.py"]
