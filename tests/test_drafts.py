@@ -6,17 +6,17 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from finance.models import TransactionPreview
 from schemas.api import Draft
-from schemas.parse import ParsedTransaction
-from services.drafts import create_transaction_draft
+from services.drafts import create_transaction_draft_from_preview
 
 
-def _draft(kind: str, payload: dict[str, Any], did: str = "d1") -> Draft:
+def _draft(payload: dict[str, Any], did: str = "d1") -> Draft:
     return Draft.model_validate(
         {
             "id": did,
             "userId": "u",
-            "kind": kind,
+            "kind": "transaction",
             "status": "pending",
             "payload": payload,
             "source": "bot",
@@ -29,24 +29,24 @@ def _draft(kind: str, payload: dict[str, Any], did: str = "d1") -> Draft:
 
 
 @pytest.mark.asyncio
-async def test_create_draft_without_category_lookup() -> None:
+async def test_create_from_preview_sends_category_id_and_idempotency() -> None:
     client = AsyncMock()
     client.create_draft.return_value = _draft(
-        "transaction",
-        {"categoryName": "Food", "type": "expense", "amount": 45},
+        {"categoryId": "c1", "categoryName": "Food", "type": "expense", "amount": 45}
     )
-
-    parsed = ParsedTransaction(
-        amount=Decimal("45"),
-        description="lunch Food",
+    preview = TransactionPreview(
+        preview_id="p1",
+        idempotency_key="p1",
+        preview_hash="h",
         type="expense",
-        category_hint="Food",
-        note="lunch",
+        amount=Decimal("45.00"),
+        category_id="c1",
+        category_name="Food",
+        date_iso="2026-11-03",
+        description="lunch",
+        expires_at=9e12,
     )
-    await create_transaction_draft(client, parsed)
-    assert client.create_draft.await_count == 1
-    client.list_categories.assert_not_called()
+    await create_transaction_draft_from_preview(client, preview)
     body = client.create_draft.await_args.args[0]
-    assert body.kind == "transaction"
-    assert body.payload.category_name == "Food"
-    assert body.payload.category_id is None
+    assert body.payload.category_id == "c1"
+    assert client.create_draft.await_args.kwargs["idempotency_key"] == "p1"

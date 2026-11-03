@@ -6,14 +6,16 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from presentation.messages import (
-    format_api_error,
-    format_period_summary,
-    format_today_list,
-    format_week_summary,
-)
+from presentation.messages import format_api_error
 from services.api_client import MimirApiClient, MimirApiError
 from services.dates import current_month_range, shift_date, today_local
+from services.reports import (
+    fetch_pending_tx_drafts,
+    format_summary_with_drafts,
+    format_today_with_drafts,
+    format_week_with_drafts,
+    pending_tx_drafts_in_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,12 @@ async def _reply_today(target: Message, api: MimirApiClient) -> None:
     try:
         today = today_local()
         transactions = await api.list_transactions(from_date=today, to_date=today)
-        await target.answer(format_today_list(transactions))
+        drafts = pending_tx_drafts_in_range(
+            await fetch_pending_tx_drafts(api),
+            from_date=today,
+            to_date=today,
+        )
+        await target.answer(format_today_with_drafts(transactions, drafts))
     except MimirApiError as exc:
         logger.error("[today] %s", exc)
         await target.answer(format_api_error(exc.kind))
@@ -37,7 +44,14 @@ async def _reply_week(target: Message, api: MimirApiClient) -> None:
         transactions = await api.list_transactions(
             from_date=from_date, to_date=to_date, limit=200
         )
-        await target.answer(format_week_summary(transactions, from_date, to_date))
+        drafts = pending_tx_drafts_in_range(
+            await fetch_pending_tx_drafts(api),
+            from_date=from_date,
+            to_date=to_date,
+        )
+        await target.answer(
+            format_week_with_drafts(transactions, drafts, from_date, to_date)
+        )
     except MimirApiError as exc:
         logger.error("[week] %s", exc)
         await target.answer(format_api_error(exc.kind))
@@ -47,7 +61,12 @@ async def _reply_summary(target: Message, api: MimirApiClient) -> None:
     try:
         from_date, to_date = current_month_range()
         summary = await api.get_summary(from_date=from_date, to_date=to_date)
-        await target.answer(format_period_summary(summary))
+        drafts = pending_tx_drafts_in_range(
+            await fetch_pending_tx_drafts(api),
+            from_date=from_date,
+            to_date=to_date,
+        )
+        await target.answer(format_summary_with_drafts(summary, drafts))
     except MimirApiError as exc:
         logger.error("[summary] %s", exc)
         await target.answer(format_api_error(exc.kind))

@@ -77,6 +77,8 @@ def test_format_period_summary() -> None:
     assert "R$ 600,00" in text
 
 
-def test_format_draft_saved_expense_shows_minus() -> None:
+def test_format_draft_saved_expense() -> None:
     text = format_draft_saved(Decimal("30"), "Pets", tx_type="expense")
-    assert "Draft saved: -R$" in text
+    assert "Despesa" in text
+    assert "R$ 30,00" in text
+    assert "Pets" in text

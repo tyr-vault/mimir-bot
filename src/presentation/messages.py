@@ -26,25 +26,29 @@ def format_currency(amount: Decimal | float | int) -> str:
 def format_help() -> str:
     return "\n".join(
         [
-            "💰 Personal Finance",
+            "💰 Personal Finance (modo estrito)",
             "",
-            "Creates are saved as drafts — confirm or fix in the dashboard (auto after 3 days).",
+            "Nada é gravado sem sua confirmação no Telegram.",
+            "Após confirmar, vira rascunho (draft) — finalize no dashboard (auto em 3 dias).",
+            "Relatórios do bot incluem rascunhos pendentes.",
             "",
             "Commands:",
             "/start — welcome and this help",
             "/help — list all commands",
-            "/add <signed amount> [note...] <category> — transaction draft",
-            "    -45 … → expense · 500 … → income",
-            "/category <name> — category draft",
-            "/categories — list confirmed categories",
-            "/today — today's transactions + totals",
-            "/week — last 7 days + totals",
-            "/summary — current month income / expenses / balance",
+            "/add <signed amount> [note...] <category> — atalho estruturado",
+            "    -45 … → despesa · 500 … → receita",
+            "Texto livre (PT): gastei 45 reais no mercado ontem",
+            "/category <name> — rascunho de categoria (com confirmação)",
+            "/categories — categorias confirmadas",
+            "/today — hoje (confirmados + rascunhos)",
+            "/week — últimos 7 dias",
+            "/summary — mês atual",
+            "/cancel — cancela fluxo em andamento",
             "",
             "Examples:",
             "/add -45 lunch Food",
-            "/add 500 salary Income",
-            "/category Food",
+            "gastei 45 reais no Food",
+            "recebi 500 Income",
         ]
     )
 
@@ -55,14 +59,56 @@ def format_draft_saved(
     tx_type: str = "expense",
     note: str | None = None,
 ) -> str:
-    sign = "+" if tx_type == "income" else "-"
+    label = "Receita" if tx_type == "income" else "Despesa"
     detail = f"{note} · {category_name}" if note and note.strip() else category_name
     return "\n".join(
         [
-            f"📝 Draft saved: {sign}{format_currency(amount)} — {detail}",
-            "Confirm or edit in the dashboard (auto-confirms in 3 days).",
+            f"📝 Rascunho salvo: {label} {format_currency(amount)} — {detail}",
+            "Confirme ou edite no dashboard (auto em 3 dias).",
         ]
     )
+
+
+def format_transaction_preview(
+    *,
+    tx_type: str,
+    amount: Decimal,
+    category_name: str,
+    date_iso: str,
+    description: str | None,
+) -> str:
+    label = "Receita" if tx_type == "income" else "Despesa"
+    icon = "💰" if tx_type == "income" else "💸"
+    y, m, d = date_iso.split("-")
+    date_br = f"{d}/{m}/{y}"
+    lines = [
+        "Confira a transação:",
+        "",
+        f"{icon} {label}: {format_currency(amount)}",
+        f"📁 Categoria: {category_name}",
+    ]
+    if description and description.strip():
+        lines.append(f"📝 Descrição: {description.strip()}")
+    lines.append(f"📅 Data: {date_br}")
+    lines.append("")
+    lines.append("Deseja registrar como rascunho?")
+    return "\n".join(lines)
+
+
+def format_clarify(message: str) -> str:
+    return f"{message}\n\n(envie /cancel para abortar)"
+
+
+def format_reject(message: str) -> str:
+    return f"❌ {message}"
+
+
+def format_cancelled() -> str:
+    return "Operação cancelada. Nada foi gravado."
+
+
+def format_expired() -> str:
+    return "Essa confirmação expirou. Envie a transação novamente."
 
 
 def format_category_draft_saved(name: str) -> str:

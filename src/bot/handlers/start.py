@@ -26,8 +26,9 @@ async def cb_hint_add(callback: CallbackQuery) -> None:
     await callback.answer()
     if callback.message:
         await callback.message.answer(
-            "Use /add only:\n"
-            "`/add -45 lunch Food` → expense\n"
-            "`/add 500 salary Income` → income",
+            "Exemplos (sempre com confirmação):\n"
+            "`/add -45 lunch Food`\n"
+            "`gastei 45 reais no Food`\n"
+            "`/add 500 salary Income`",
             parse_mode="Markdown",
         )

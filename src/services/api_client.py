@@ -78,14 +78,27 @@ class MimirApiClient:
         data = await self._request("GET", "/categories")
         return TypeAdapter(list[Category]).validate_python(data)
 
-    async def create_draft(self, body: CreateDraftBody) -> Draft:
+    async def create_draft(
+        self,
+        body: CreateDraftBody,
+        *,
+        idempotency_key: str | None = None,
+    ) -> Draft:
+        extra_headers: dict[str, str] = {}
+        if idempotency_key:
+            extra_headers["Idempotency-Key"] = idempotency_key
         data = await self._request(
             "POST",
             "/drafts",
             json=body.to_api_dict(),
             allow_retry_on_401=False,
+            extra_headers=extra_headers,
         )
         return Draft.model_validate(data)
+
+    async def list_drafts(self, *, status: str = "pending") -> list[Draft]:
+        data = await self._request("GET", "/drafts", params={"status": status})
+        return TypeAdapter(list[Draft]).validate_python(data)
 
     async def list_transactions(
         self,
@@ -117,11 +130,14 @@ class MimirApiClient:
         params: dict[str, str] | None = None,
         allow_retry_on_401: bool = True,
         retried: bool = False,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         if not self._token:
             await self.login()
 
         headers = {"Authorization": f"Bearer {self._token}"}
+        if extra_headers:
+            headers.update(extra_headers)
         try:
             response = await self._client.request(
                 method,
@@ -142,6 +158,7 @@ class MimirApiClient:
                 params=params,
                 allow_retry_on_401=False,
                 retried=True,
+                extra_headers=extra_headers,
             )
 
         if response.status_code >= 400:

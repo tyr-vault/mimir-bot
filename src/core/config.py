@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     api_timeout_seconds: float = Field(default=15.0, alias="API_TIMEOUT_SECONDS")
     timezone: str = Field(default="America/Sao_Paulo", alias="BOT_TIMEZONE")
+    pending_ttl_minutes: int = Field(default=15, alias="PENDING_TTL_MINUTES")
 
     @field_validator("api_url")
     @classmethod

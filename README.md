@@ -8,10 +8,11 @@ See [MIGRATION.md](MIGRATION.md) for the grammY → aiogram cutover notes.
 
 ## Features
 
-- **`/add` only** for transaction drafts: negative = expense, positive = income
-- Category labels on drafts are **not validated** in the bot (fix in dashboard)
-- `/category` for category drafts; `/categories`, `/today`, `/week`, `/summary`
-- Main menu on `/start`
+- Fail-closed NL + `/add` pipeline (ACCEPT / CLARIFY / REJECT)
+- Explicit Telegram confirmation before `POST /drafts`
+- Categories must exist (exact match); no silent inventing
+- Reports include pending drafts
+- See [docs/STRICT_UX.md](docs/STRICT_UX.md)
 
 ## Setup
 

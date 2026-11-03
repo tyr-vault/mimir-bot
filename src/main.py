@@ -6,6 +6,7 @@ import sys
 from contextlib import suppress
 
 from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.middlewares.api_client import ApiClientMiddleware
 from bot.middlewares.auth import AllowedUserMiddleware
@@ -30,7 +31,7 @@ async def _create_api_client(settings: Settings) -> MimirApiClient:
 
 
 def _build_dispatcher(settings: Settings, api: MimirApiClient) -> Dispatcher:
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
     dp.update.middleware(AllowedUserMiddleware(settings.telegram_allowed_user_id))
     dp.update.middleware(ApiClientMiddleware(api))
     setup_routers(dp)
