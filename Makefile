@@ -1,4 +1,4 @@
-.PHONY: help setup ensure-api install test lint typecheck dev up down logs restart rebuild ps clean prod-up prod-down
+.PHONY: help setup ensure-api install test lint typecheck dev up down logs restart rebuild ps clean prod-up prod-down prod-logs
 
 # Sibling mimir-api repo (override: make dev API_DIR=/path/to/mimir-api)
 API_DIR       ?= $(abspath ../mimir-api)
@@ -95,6 +95,9 @@ prod-up: setup ## Build and start production bot (detached)
 
 prod-down: ## Stop production bot
 	$(COMPOSE_PROD) down
+
+prod-logs: ## Follow production bot logs
+	$(COMPOSE_PROD) logs -f bot
 
 clean: down ## Stop bot stack
 	@echo "Bot stopped. mimir-api left running — stop it with: make -C $(API_DIR) down"
