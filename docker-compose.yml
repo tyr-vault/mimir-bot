@@ -18,3 +18,7 @@ services:
       # Linux: map host.docker.internal → host gateway (API on :5000)
       - 'host.docker.internal:host-gateway'
     restart: unless-stopped
+
+networks:
+  homelab:
+    external: true
